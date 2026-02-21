@@ -7,11 +7,11 @@
 
 | レイヤー | 目的・観点 | 対象コンポーネント | 利用技術・アプローチ |
 |---|---|---|---|
-| **ユニットテスト (Unit Test)** | ビジネスロジックが期待通りに単独で動作することを保証する。外部依存をモック化して高速に実行・フィードバックを得る。 | Service, Domain Models, Utils | `JUnit 5` / `Kotest` + `MockK` |
-| **コンポーネントテスト (Component / API Test)** | APIの入口（Controller）の振る舞いを検証する。ステータスコード、I/Oマッピング、バリデーションが正しいか。 | Controller | `@WebMvcTest` + `MockMvc` + `MockK` |
-| **結合テスト - DB層 (Integration Test - DB)** | データベースとの接続、O/Rマッパー（JPA）の設定、カスタムクエリが正しく動作するか。 | Repository | `@DataJpaTest` (+ 必要に応じて `Testcontainers`) |
-| **結合テスト - 外部API層 (Integration Test - External API)** | 自サービスが外部サービスに対して正しいリクエストを送り、異常系を含めた様々なレスポンスを正しく処理できるか。 | External Client, Service | `@SpringBootTest` + `WireMock` |
-| **契約テスト (Contract Test)** | マイクロサービス間でAPIインターフェースの互換性が保たれていることを保証する。 | Consumer & Provider API | `Pact` |
+| **ユニットテスト (Unit Test)** | ビジネスロジックが期待通りに単独で動作することを保証する。外部依存をモック化して高速に実行・フィードバックを得る。 | Service, Domain Models, Utils | `JUnit 5` (Runner) + `Kotest Matchers` + `MockK` |
+| **コンポーネントテスト (Component / API Test)** | APIの入口（Controller）の振る舞いを検証する。ステータスコード、I/Oマッピング、バリデーションが正しいか。 | Controller | `JUnit 5` / `@WebMvcTest` + `MockMvc` + `MockK` |
+| **結合テスト - DB層 (Integration Test - DB)** | データベースとの接続、O/Rマッパー（JPA）の設定、カスタムクエリが正しく動作するか。 | Repository | `JUnit 5` / `@DataJpaTest` (+ 必要に応じて `Testcontainers`) |
+| **結合テスト - 外部API層 (Integration Test - External API)** | 自サービスが外部サービスに対して正しいリクエストを送り、異常系を含めた様々なレスポンスを正しく処理できるか。 | External Client, Service | `JUnit 5` / `@SpringBootTest` + `WireMock` |
+| **契約テスト (Contract Test)** | マイクロサービス間でAPIインターフェースの互換性が保たれていることを保証する。 | Consumer & Provider API | `Pact` (JUnit 5 拡張) |
 | **E2E（ブラウザ）テスト (E2E Test)** | ユーザー視点でシステム全体が正しく動作するか検証する（少なめに保つ）。 | UI ~ Backend連携 | `Playwright` / `Selenium` |
 
 ---
