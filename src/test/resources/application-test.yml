@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: order-service-test
+
+external-services:
+  inventory:
+    base-url: http://localhost:${wiremock.server.port}
+  payment:
+    base-url: http://localhost:${wiremock.server.port}
