@@ -245,10 +245,51 @@ class OrderServiceWireMockTest {
         }
 
         @Nested
-        inner class `異常系_外部サービスタイムアウト` {
+        inner class `異常系_外部サービス本物のタイムアウト` {
             @Test
-            fun `在庫サービスがタイムアウトした場合_エラーステータスになること`() {
-                // Arrange: 在庫サービスが遅延レスポンス
+            fun `在庫サービスからの応答が遅延してタイムアウトした場合_500エラーステータスになること`() {
+                // Arrange: 在庫サービスが3秒後(タイムアウト指定の2秒より後)の遅延レスポンス
+                wireMockServer.stubFor(
+                    get(urlPathMatching("/api/inventory/.*"))
+                        .willReturn(
+                            aResponse()
+                                .withFixedDelay(3000)
+                                .withStatus(200)
+                                .withHeader("Content-Type", MediaType.APPLICATION_JSON_VALUE)
+                                .withBody(
+                                    """
+                                    {
+                                        "productId": "PROD-100",
+                                        "productName": "テスト商品",
+                                        "available": true,
+                                        "quantity": 100,
+                                        "unitPrice": 1500.00
+                                    }
+                                    """.trimIndent()
+                                )
+                        )
+                )
+
+                // Act
+                val request = OrderRequestDto(
+                    productId = "PROD-100",
+                    quantity = 1,
+                    customerId = "CUST-001"
+                )
+                val response = restTemplate.postForEntity(
+                    "/api/orders",
+                    request,
+                    OrderResponseDto::class.java
+                )
+
+                // Assert: WebClientがタイムアウトし、OrderApplicationServiceが例外を捕捉してERRORステータスの注文を返すこと
+                response.statusCode.value() shouldBe 200
+                response.body!!.status shouldBe OrderStatus.ERROR
+            }
+            
+            @Test
+            fun `在庫サービスが即座にエラーした場合_エラーステータスになること`() {
+                // Arrange: 在庫サービスが即時500エラーレスポンス
                 wireMockServer.stubFor(
                     get(urlPathMatching("/api/inventory/.*"))
                         .willReturn(
@@ -271,7 +312,7 @@ class OrderServiceWireMockTest {
                     OrderResponseDto::class.java
                 )
 
-                // Assert
+                // Assert: 即時エラーの場合も例外が捕捉されERRORステータスの注文が返されること
                 response.statusCode.value() shouldBe 200
                 response.body!!.status shouldBe OrderStatus.ERROR
             }

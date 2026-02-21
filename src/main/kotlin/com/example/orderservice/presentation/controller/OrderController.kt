@@ -5,6 +5,7 @@ import com.example.orderservice.application.dto.OrderResponseDto
 import com.example.orderservice.application.service.OrderApplicationService
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import jakarta.validation.Valid
 
 /**
  * 注文 REST API コントローラー
@@ -19,7 +20,7 @@ class OrderController(
      * 注文を作成する
      */
     @PostMapping
-    fun createOrder(@RequestBody request: OrderRequestDto): ResponseEntity<OrderResponseDto> {
+    fun createOrder(@Valid @RequestBody request: OrderRequestDto): ResponseEntity<OrderResponseDto> {
         val response = orderApplicationService.createOrder(request)
         return ResponseEntity.ok(response)
     }
