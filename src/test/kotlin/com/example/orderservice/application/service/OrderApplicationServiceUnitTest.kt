@@ -1,10 +1,14 @@
-package com.example.orderservice.service
+package com.example.orderservice.application.service
 
-import com.example.orderservice.client.InventoryClient
-import com.example.orderservice.client.PaymentClient
-import com.example.orderservice.model.*
-import com.example.orderservice.repository.OrderEntity
-import com.example.orderservice.repository.OrderRepository
+import com.example.orderservice.application.dto.OrderRequestDto
+import com.example.orderservice.application.port.out.InventoryPort
+import com.example.orderservice.application.port.out.InventoryResult
+import com.example.orderservice.application.port.out.PaymentPort
+import com.example.orderservice.application.port.out.PaymentResult
+import com.example.orderservice.application.port.out.PaymentResultStatus
+import com.example.orderservice.domain.model.Order
+import com.example.orderservice.domain.model.OrderStatus
+import com.example.orderservice.domain.repository.OrderRepository
 import io.mockk.*
 import io.mockk.impl.annotations.InjectMockKs
 import io.mockk.impl.annotations.MockK
@@ -17,31 +21,27 @@ import org.junit.jupiter.api.extension.ExtendWith
 import java.math.BigDecimal
 
 /**
- * 注文サービスのユニットテスト (Unit Test レイヤー)
- *
- * 観点:
- * 1. ビジネスロジックが正しく機能するか
- * 2. 外部依存（Client, Repository）をMock化し、対象クラス（OrderService）単体の振る舞いを高速に検証する
+ * 注文アプリケーションサービスのユニットテスト (Unit Test レイヤー)
  */
 @ExtendWith(MockKExtension::class)
-class OrderServiceUnitTest {
+class OrderApplicationServiceUnitTest {
 
     @MockK
-    private lateinit var inventoryClient: InventoryClient
+    private lateinit var inventoryPort: InventoryPort
 
     @MockK
-    private lateinit var paymentClient: PaymentClient
+    private lateinit var paymentPort: PaymentPort
 
     @MockK
     private lateinit var orderRepository: OrderRepository
 
     @InjectMockKs
-    private lateinit var orderService: OrderService
+    private lateinit var orderApplicationService: OrderApplicationService
 
     @BeforeEach
     fun setUp() {
         // いつでもRepositoryのsaveが呼ばれたら引数をそのまま返すようにモック
-        every { orderRepository.save(any<OrderEntity>()) } returnsArgument 0
+        every { orderRepository.save(any<Order>()) } returnsArgument 0
     }
 
     @Nested
@@ -50,28 +50,24 @@ class OrderServiceUnitTest {
         @Test
         fun `正常系_在庫があり決済も成功した場合_CONFIRMEDステータスで注文が作成されること`() {
             // Arrange
-            val request = OrderRequest(productId = "PROD-001", quantity = 2, customerId = "CUST-001")
+            val request = OrderRequestDto(productId = "PROD-001", quantity = 2, customerId = "CUST-001")
             val unitPrice = BigDecimal("1500.00")
             
             // 在庫ありのモック
-            every { inventoryClient.checkInventory(request.productId) } returns InventoryResponse(
-                productId = request.productId,
-                productName = "テスト商品",
+            every { inventoryPort.checkInventory(request.productId) } returns InventoryResult(
                 available = true,
                 quantity = 10,
                 unitPrice = unitPrice
             )
             
             // 決済成功のモック
-            every { paymentClient.processPayment(any()) } returns PaymentResponse(
-                paymentId = "PAY-001",
-                orderId = "dummy",
-                status = PaymentStatus.SUCCESS,
+            every { paymentPort.processPayment(any(), any(), any()) } returns PaymentResult(
+                status = PaymentResultStatus.SUCCESS,
                 transactionId = "TXN-12345"
             )
 
             // Act
-            val response = orderService.createOrder(request)
+            val response = orderApplicationService.createOrder(request)
 
             // Assert
             response.status shouldBe OrderStatus.CONFIRMED
@@ -80,33 +76,31 @@ class OrderServiceUnitTest {
             response.totalAmount shouldBe unitPrice.multiply(BigDecimal(request.quantity))
             
             // 呼び出し回数の検証
-            verify(exactly = 1) { inventoryClient.checkInventory(request.productId) }
-            verify(exactly = 1) { paymentClient.processPayment(any()) }
+            verify(exactly = 1) { inventoryPort.checkInventory(request.productId) }
+            verify(exactly = 1) { paymentPort.processPayment(any(), any(), any()) }
             verify(exactly = 1) { orderRepository.save(any()) }
         }
 
         @Test
         fun `異常系_在庫が足りない場合_OUT_OF_STOCKステータスとなり決済は呼ばれないこと`() {
             // Arrange
-            val request = OrderRequest(productId = "PROD-002", quantity = 5, customerId = "CUST-001")
+            val request = OrderRequestDto(productId = "PROD-002", quantity = 5, customerId = "CUST-001")
             
             // 在庫不足のモック (要求数5に対して在庫2)
-            every { inventoryClient.checkInventory(request.productId) } returns InventoryResponse(
-                productId = request.productId,
-                productName = "テスト商品",
+            every { inventoryPort.checkInventory(request.productId) } returns InventoryResult(
                 available = true,
                 quantity = 2,
                 unitPrice = BigDecimal("1000.00")
             )
 
             // Act
-            val response = orderService.createOrder(request)
+            val response = orderApplicationService.createOrder(request)
 
             // Assert
             response.status shouldBe OrderStatus.OUT_OF_STOCK
             
-            // 検証：決済クライアントは呼ばれていないこと
-            verify(exactly = 0) { paymentClient.processPayment(any()) }
+            // 検証：決済ポートは呼ばれていないこと
+            verify(exactly = 0) { paymentPort.processPayment(any(), any(), any()) }
             // 検証：DBには保存されていること
             verify(exactly = 1) { orderRepository.save(any()) }
         }
@@ -114,26 +108,22 @@ class OrderServiceUnitTest {
         @Test
         fun `異常系_決済が失敗した場合_PAYMENT_FAILEDステータスで注文が保存されること`() {
             // Arrange
-            val request = OrderRequest(productId = "PROD-003", quantity = 1, customerId = "CUST-001")
+            val request = OrderRequestDto(productId = "PROD-003", quantity = 1, customerId = "CUST-001")
             
-            every { inventoryClient.checkInventory(request.productId) } returns InventoryResponse(
-                productId = request.productId,
-                productName = "テスト商品",
+            every { inventoryPort.checkInventory(request.productId) } returns InventoryResult(
                 available = true,
                 quantity = 10,
                 unitPrice = BigDecimal("2000.00")
             )
             
             // 決済失敗のモック
-            every { paymentClient.processPayment(any()) } returns PaymentResponse(
-                paymentId = "PAY-002",
-                orderId = "dummy",
-                status = PaymentStatus.FAILED,
+            every { paymentPort.processPayment(any(), any(), any()) } returns PaymentResult(
+                status = PaymentResultStatus.FAILED,
                 transactionId = null
             )
 
             // Act
-            val response = orderService.createOrder(request)
+            val response = orderApplicationService.createOrder(request)
 
             // Assert
             response.status shouldBe OrderStatus.PAYMENT_FAILED

@@ -1,11 +1,11 @@
-package com.example.orderservice.repository
+package com.example.orderservice.infrastructure.persistence
 
-import com.example.orderservice.model.OrderStatus
+import com.example.orderservice.domain.model.OrderStatus
 import jakarta.persistence.*
 import java.math.BigDecimal
 
 /**
- * 注文エンティティ
+ * 注文エンティティ（インフラストラクチャ層・DBマッピング用）
  */
 @Entity
 @Table(name = "orders")
