@@ -1,0 +1,12 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: order-service
+
+external-services:
+  inventory:
+    base-url: http://localhost:8081
+  payment:
+    base-url: http://localhost:8082
