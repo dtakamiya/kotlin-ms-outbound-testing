@@ -64,4 +64,31 @@ class OrderControllerTest {
             }) 
         }
     }
+
+    @Test
+    fun `数量が0などの不正なリクエストの場合_400 Bad Requestが返ること`() {
+        val request = OrderRequestDto(
+            productId = "",
+            quantity = 0,
+            customerId = ""
+        )
+        
+        mockMvc.post("/api/orders") {
+            contentType = MediaType.APPLICATION_JSON
+            content = objectMapper.writeValueAsString(request)
+            accept = MediaType.APPLICATION_JSON
+        }.andExpect {
+            status { isBadRequest() }
+            content { contentType(MediaType.APPLICATION_JSON) }
+            jsonPath("$.status") { value(400) }
+            jsonPath("$.message") { value("Validation failed") }
+            jsonPath("$.details.productId") { value("productId must not be blank") }
+            jsonPath("$.details.quantity") { value("quantity must be at least 1") }
+            jsonPath("$.details.customerId") { value("customerId must not be blank") }
+        }
+
+        verify(exactly = 0) { 
+            orderApplicationService.createOrder(any()) 
+        }
+    }
 }
