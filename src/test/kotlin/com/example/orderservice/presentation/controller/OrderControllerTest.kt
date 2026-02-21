@@ -1,9 +1,9 @@
-package com.example.orderservice.controller
+package com.example.orderservice.presentation.controller
 
-import com.example.orderservice.model.OrderRequest
-import com.example.orderservice.model.OrderResponse
-import com.example.orderservice.model.OrderStatus
-import com.example.orderservice.service.OrderService
+import com.example.orderservice.application.dto.OrderRequestDto
+import com.example.orderservice.application.dto.OrderResponseDto
+import com.example.orderservice.application.service.OrderApplicationService
+import com.example.orderservice.domain.model.OrderStatus
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.ninjasquad.springmockk.MockkBean
 import io.mockk.every
@@ -16,15 +16,6 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.post
 import java.math.BigDecimal
 
-/**
- * コントローラーのコンポーネントテスト (Component Test / API Test レイヤー)
- *
- * 観点:
- * 1. HTTPリクエストのマッピング (URL, Method) が正しいか
- * 2. 入力バリデーションやシリアライズ／デシリアライズが機能するか
- * 3. 適切なHTTPステータスコードが返却されるか
- * ※ Service層以降はモック化し、Web層の関心事に特化する
- */
 @WebMvcTest(OrderController::class)
 class OrderControllerTest {
 
@@ -34,19 +25,17 @@ class OrderControllerTest {
     @Autowired
     private lateinit var objectMapper: ObjectMapper
 
-    // Spring MockKを使用してService層をモック化
     @MockkBean
-    private lateinit var orderService: OrderService
+    private lateinit var orderApplicationService: OrderApplicationService
 
     @Test
     fun `正常なリクエストの場合_200 OKと注文レスポンスが返ること`() {
-        // Arrange
-        val request = OrderRequest(
+        val request = OrderRequestDto(
             productId = "PROD-100",
             quantity = 3,
             customerId = "CUST-100"
         )
-        val response = OrderResponse(
+        val response = OrderResponseDto(
             orderId = "ORDER-888",
             productId = "PROD-100",
             quantity = 3,
@@ -55,10 +44,8 @@ class OrderControllerTest {
             status = OrderStatus.CONFIRMED
         )
         
-        // モックの設定
-        every { orderService.createOrder(any()) } returns response
+        every { orderApplicationService.createOrder(any()) } returns response
 
-        // Act & Assert
         mockMvc.post("/api/orders") {
             contentType = MediaType.APPLICATION_JSON
             content = objectMapper.writeValueAsString(request)
@@ -71,9 +58,8 @@ class OrderControllerTest {
             jsonPath("$.status") { value("CONFIRMED") }
         }
 
-        // Serviceが正しく呼び出されたことを検証
         verify(exactly = 1) { 
-            orderService.createOrder(match { 
+            orderApplicationService.createOrder(match { 
                 it.productId == "PROD-100" && it.quantity == 3 
             }) 
         }

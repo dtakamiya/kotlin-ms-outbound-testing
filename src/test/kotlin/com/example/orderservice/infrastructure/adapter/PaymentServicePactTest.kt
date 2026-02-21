@@ -1,4 +1,4 @@
-package com.example.orderservice.pact
+package com.example.orderservice.infrastructure.adapter
 
 import au.com.dius.pact.consumer.MockServer
 import au.com.dius.pact.consumer.dsl.PactDslWithProvider
@@ -6,28 +6,17 @@ import au.com.dius.pact.consumer.junit5.PactConsumerTestExt
 import au.com.dius.pact.consumer.junit5.PactTestFor
 import au.com.dius.pact.core.model.V4Pact
 import au.com.dius.pact.core.model.annotations.Pact
-import com.example.orderservice.client.PaymentClient
-import com.example.orderservice.model.PaymentRequest
-import com.example.orderservice.model.PaymentStatus
+import com.example.orderservice.application.port.out.PaymentResultStatus
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.springframework.web.reactive.function.client.WebClient
 import java.math.BigDecimal
 
-/**
- * Pact コンシューマー契約テスト - Payment Service
- *
- * Order Service（コンシューマー）が Payment Service（プロバイダー）に
- * 期待するインタラクションを契約として定義する
- */
 @ExtendWith(PactConsumerTestExt::class)
 @PactTestFor(providerName = "PaymentService")
 class PaymentServicePactTest {
 
-    /**
-     * 決済成功の契約
-     */
     @Pact(consumer = "OrderService", provider = "PaymentService")
     fun successfulPaymentPact(builder: PactDslWithProvider): V4Pact {
         return builder
@@ -62,9 +51,6 @@ class PaymentServicePactTest {
             .toPact(V4Pact::class.java)
     }
 
-    /**
-     * 決済失敗の契約
-     */
     @Pact(consumer = "OrderService", provider = "PaymentService")
     fun failedPaymentPact(builder: PactDslWithProvider): V4Pact {
         return builder
@@ -102,51 +88,28 @@ class PaymentServicePactTest {
     @Test
     @PactTestFor(pactMethod = "successfulPaymentPact")
     fun `決済が正常に処理されること`(mockServer: MockServer) {
-        // Arrange
         val webClient = WebClient.builder()
             .baseUrl(mockServer.getUrl())
             .build()
-        val client = PaymentClient(webClient)
+        val client = PaymentClientAdapter(webClient)
 
-        val request = PaymentRequest(
-            orderId = "ORDER-001",
-            customerId = "CUST-001",
-            amount = BigDecimal("3000.00"),
-            currency = "JPY"
-        )
+        val response = client.processPayment("ORDER-001", "CUST-001", BigDecimal("3000.00"))
 
-        // Act
-        val response = client.processPayment(request)
-
-        // Assert
-        response.paymentId shouldBe "PAY-001"
-        response.orderId shouldBe "ORDER-001"
-        response.status shouldBe PaymentStatus.SUCCESS
+        response.status shouldBe PaymentResultStatus.SUCCESS
         response.transactionId shouldBe "TXN-12345"
     }
 
     @Test
     @PactTestFor(pactMethod = "failedPaymentPact")
     fun `決済が失敗した場合FAILEDステータスが返ること`(mockServer: MockServer) {
-        // Arrange
         val webClient = WebClient.builder()
             .baseUrl(mockServer.getUrl())
             .build()
-        val client = PaymentClient(webClient)
+        val client = PaymentClientAdapter(webClient)
 
-        val request = PaymentRequest(
-            orderId = "ORDER-002",
-            customerId = "CUST-002",
-            amount = BigDecimal("999999.00"),
-            currency = "JPY"
-        )
+        val response = client.processPayment("ORDER-002", "CUST-002", BigDecimal("999999.00"))
 
-        // Act
-        val response = client.processPayment(request)
-
-        // Assert
-        response.paymentId shouldBe "PAY-002"
-        response.status shouldBe PaymentStatus.FAILED
+        response.status shouldBe PaymentResultStatus.FAILED
         response.transactionId shouldBe null
     }
 }

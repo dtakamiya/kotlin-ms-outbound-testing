@@ -1,8 +1,8 @@
 package com.example.orderservice.integration
 
-import com.example.orderservice.model.OrderRequest
-import com.example.orderservice.model.OrderResponse
-import com.example.orderservice.model.OrderStatus
+import com.example.orderservice.application.dto.OrderRequestDto
+import com.example.orderservice.application.dto.OrderResponseDto
+import com.example.orderservice.domain.model.OrderStatus
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock.*
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig
@@ -111,7 +111,7 @@ class OrderServiceWireMockTest {
                 )
 
                 // Act
-                val request = OrderRequest(
+                val request = OrderRequestDto(
                     productId = "PROD-001",
                     quantity = 2,
                     customerId = "CUST-001"
@@ -119,7 +119,7 @@ class OrderServiceWireMockTest {
                 val response = restTemplate.postForEntity(
                     "/api/orders",
                     request,
-                    OrderResponse::class.java
+                    OrderResponseDto::class.java
                 )
 
                 // Assert
@@ -161,7 +161,7 @@ class OrderServiceWireMockTest {
                 )
 
                 // Act
-                val request = OrderRequest(
+                val request = OrderRequestDto(
                     productId = "PROD-002",
                     quantity = 1,
                     customerId = "CUST-001"
@@ -169,7 +169,7 @@ class OrderServiceWireMockTest {
                 val response = restTemplate.postForEntity(
                     "/api/orders",
                     request,
-                    OrderResponse::class.java
+                    OrderResponseDto::class.java
                 )
 
                 // Assert
@@ -227,7 +227,7 @@ class OrderServiceWireMockTest {
                 )
 
                 // Act
-                val request = OrderRequest(
+                val request = OrderRequestDto(
                     productId = "PROD-003",
                     quantity = 1,
                     customerId = "CUST-001"
@@ -235,7 +235,7 @@ class OrderServiceWireMockTest {
                 val response = restTemplate.postForEntity(
                     "/api/orders",
                     request,
-                    OrderResponse::class.java
+                    OrderResponseDto::class.java
                 )
 
                 // Assert
@@ -260,7 +260,7 @@ class OrderServiceWireMockTest {
                 )
 
                 // Act
-                val request = OrderRequest(
+                val request = OrderRequestDto(
                     productId = "PROD-004",
                     quantity = 1,
                     customerId = "CUST-001"
@@ -268,7 +268,7 @@ class OrderServiceWireMockTest {
                 val response = restTemplate.postForEntity(
                     "/api/orders",
                     request,
-                    OrderResponse::class.java
+                    OrderResponseDto::class.java
                 )
 
                 // Assert

@@ -1,4 +1,4 @@
-package com.example.orderservice.config
+package com.example.orderservice.infrastructure.config
 
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
