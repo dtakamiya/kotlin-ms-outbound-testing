@@ -16,6 +16,8 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.client.TestRestTemplate
+import org.springframework.http.HttpEntity
+import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.DynamicPropertyRegistry
@@ -241,6 +243,156 @@ class OrderServiceWireMockTest {
                 // Assert
                 response.statusCode.value() shouldBe 200
                 response.body!!.status shouldBe OrderStatus.PAYMENT_FAILED
+            }
+        }
+
+        @Nested
+        inner class `冪等性_Idempotency-Keyヘッダー` {
+
+            private fun stubSuccessfulServices() {
+                wireMockServer.stubFor(
+                    get(urlPathMatching("/api/inventory/.*"))
+                        .willReturn(
+                            aResponse()
+                                .withStatus(200)
+                                .withHeader("Content-Type", MediaType.APPLICATION_JSON_VALUE)
+                                .withBody(
+                                    """
+                                    {
+                                        "productId": "PROD-IDEMP",
+                                        "productName": "冪等性テスト商品",
+                                        "available": true,
+                                        "quantity": 100,
+                                        "unitPrice": 1500.00
+                                    }
+                                    """.trimIndent()
+                                )
+                        )
+                )
+
+                wireMockServer.stubFor(
+                    post(urlEqualTo("/api/payments"))
+                        .willReturn(
+                            aResponse()
+                                .withStatus(200)
+                                .withHeader("Content-Type", MediaType.APPLICATION_JSON_VALUE)
+                                .withBody(
+                                    """
+                                    {
+                                        "paymentId": "PAY-IDEMP",
+                                        "orderId": "dummy",
+                                        "status": "SUCCESS",
+                                        "transactionId": "TXN-IDEMP"
+                                    }
+                                    """.trimIndent()
+                                )
+                        )
+                )
+            }
+
+            @Test
+            fun `同一キーで2回POSTすると注文が1つだけ作成され2回目はキャッシュレスポンスが返ること`() {
+                stubSuccessfulServices()
+
+                val request = OrderRequestDto(
+                    productId = "PROD-IDEMP",
+                    quantity = 2,
+                    customerId = "CUST-IDEMP"
+                )
+
+                val headers = HttpHeaders().apply {
+                    contentType = MediaType.APPLICATION_JSON
+                    set("Idempotency-Key", "idem-key-integration-001")
+                }
+                val httpEntity = HttpEntity(request, headers)
+
+                // 1回目のリクエスト
+                val response1 = restTemplate.postForEntity(
+                    "/api/orders",
+                    httpEntity,
+                    OrderResponseDto::class.java
+                )
+
+                response1.statusCode.value() shouldBe 200
+                response1.body shouldNotBe null
+                response1.body!!.status shouldBe OrderStatus.CONFIRMED
+                val firstOrderId = response1.body!!.orderId
+
+                // 2回目のリクエスト（同一キー）
+                val response2 = restTemplate.postForEntity(
+                    "/api/orders",
+                    httpEntity,
+                    OrderResponseDto::class.java
+                )
+
+                response2.statusCode.value() shouldBe 200
+                response2.body shouldNotBe null
+                response2.body!!.orderId shouldBe firstOrderId
+                response2.body!!.status shouldBe OrderStatus.CONFIRMED
+
+                // 外部サービスは1回だけ呼ばれること（2回目はキャッシュ）
+                wireMockServer.verify(1, getRequestedFor(urlPathMatching("/api/inventory/.*")))
+                wireMockServer.verify(1, postRequestedFor(urlEqualTo("/api/payments")))
+            }
+
+            @Test
+            fun `同一キーで異なるボディを送ると422が返ること`() {
+                stubSuccessfulServices()
+
+                val request1 = OrderRequestDto(
+                    productId = "PROD-IDEMP",
+                    quantity = 2,
+                    customerId = "CUST-IDEMP"
+                )
+
+                val headers = HttpHeaders().apply {
+                    contentType = MediaType.APPLICATION_JSON
+                    set("Idempotency-Key", "idem-key-integration-002")
+                }
+
+                // 1回目
+                val httpEntity1 = HttpEntity(request1, headers)
+                val response1 = restTemplate.postForEntity(
+                    "/api/orders",
+                    httpEntity1,
+                    OrderResponseDto::class.java
+                )
+                response1.statusCode.value() shouldBe 200
+
+                // 2回目（異なるボディ）
+                val request2 = OrderRequestDto(
+                    productId = "PROD-IDEMP",
+                    quantity = 5,
+                    customerId = "CUST-IDEMP"
+                )
+                val httpEntity2 = HttpEntity(request2, headers)
+                // TestRestTemplate は422をエラーとして扱う可能性があるため、Stringで受け取る
+                val response2 = restTemplate.postForEntity(
+                    "/api/orders",
+                    httpEntity2,
+                    String::class.java
+                )
+                response2.statusCode.value() shouldBe 422
+            }
+
+            @Test
+            fun `Idempotency-Keyなしの場合_従来通りに処理されること`() {
+                stubSuccessfulServices()
+
+                val request = OrderRequestDto(
+                    productId = "PROD-IDEMP",
+                    quantity = 1,
+                    customerId = "CUST-IDEMP"
+                )
+                val response = restTemplate.postForEntity(
+                    "/api/orders",
+                    request,
+                    OrderResponseDto::class.java
+                )
+
+                response.statusCode.value() shouldBe 200
+                response.body shouldNotBe null
+                response.body!!.status shouldBe OrderStatus.CONFIRMED
             }
         }
 
